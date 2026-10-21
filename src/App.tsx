@@ -254,7 +254,7 @@ function App() {
           <select id="duration" className="duration-select" value={duration} onChange={e => {setDuration(Number(e.target.value)); void updateTimer("reset", Number(e.target.value));}}>
             {[120,300,600,900,1200,1800].map(n => <option key={n} value={n}>{n/60} min</option>)}
           </select>
-          <button className="btn btn-dark timer-main" onClick={() => void updateTimer(Boolean(timer?.ends_at) ? "pause" : "start", duration)} disabled={setupMissing}>{timerRunning ? <Pause size={15}/> : <Play size={15}/>} {timerRunning ? "Pause" : "Start"}</button>
+          <button className="btn btn-dark timer-main" onClick={() => void updateTimer(timerRunning ? "pause" : "start", duration)} disabled={setupMissing}>{timerRunning ? <Pause size={15}/> : <Play size={15}/>} {timerRunning ? "Pause" : "Start"}</button>
           <button className="btn btn-outline timer-reset" onClick={() => void updateTimer("reset", duration)} title="Reset timer" disabled={setupMissing}><TimerReset size={16}/></button>
           <button className="btn btn-outline timer-plus" onClick={() => void updateTimer("add", 60)} title="Add one minute" disabled={setupMissing}>+1m</button>
         </div>
