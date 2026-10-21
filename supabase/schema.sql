@@ -7,6 +7,7 @@ create extension if not exists pgcrypto;
 
 create table if not exists public.topics (
   id uuid primary key default gen_random_uuid(),
+  board text not null default 'team-meeting' check (char_length(board) between 1 and 40),
   title text not null check (char_length(title) between 1 and 200),
   description text check (description is null or char_length(description) <= 800),
   author text,
@@ -16,6 +17,9 @@ create table if not exists public.topics (
   sort_order double precision not null default (extract(epoch from now()) * 1000),
   created_at timestamptz not null default now()
 );
+alter table public.topics add column if not exists board text not null default 'team-meeting';
+alter table public.topics drop constraint if exists topics_board_length;
+alter table public.topics add constraint topics_board_length check (char_length(board) between 1 and 40);
 alter table public.topics add column if not exists description text;
 alter table public.topics add column if not exists author text;
 alter table public.topics add column if not exists status text not null default 'to_discuss';
@@ -197,6 +201,7 @@ grant execute on function public.timer_reset(text, integer) to anon, authenticat
 grant execute on function public.timer_add(text, integer) to anon, authenticated;
 
 create index if not exists topics_status_sort_order_idx on public.topics(status, sort_order);
+create index if not exists topics_board_status_sort_order_idx on public.topics(board, status, sort_order);
 create index if not exists topic_votes_topic_id_idx on public.topic_votes(topic_id);
 
 do $$
