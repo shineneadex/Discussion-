@@ -1,10 +1,10 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  ArrowDown, ArrowRight, ArrowUp, Check, CheckCheck, ChevronDown, CircleHelp,
-  Clock3, Copy, GripVertical, LoaderCircle, MessageSquareText, Pause, Play,
-  Plus, RefreshCw, Search, Settings2, Share2, TimerReset, Trash2, Users, Wifi,
-  WifiOff, X, Zap
+  ArrowDown, ArrowRight, ArrowUp, Check, CheckCheck, CircleHelp,
+  Clock3, GripVertical, LoaderCircle, MessageSquareText, Pause, Play,
+  Plus, RefreshCw, Search, Settings2, Share2, TimerReset, Users, Wifi,
+  X, Zap
 } from "lucide-react";
 
 type Status = "to_discuss" | "discussing" | "discussed";
@@ -13,7 +13,7 @@ type Topic = {
   status: Status; votes: number; sort_order: number; created_at: string;
 };
 type Vote = { topic_id: string; voter_id: string };
-type TimerState = { id: number; duration_seconds: number; running: boolean; ends_at: string | null; remaining_ms: number };
+type TimerState = { board: string; duration_seconds: number; remaining_seconds: number | null; ends_at: string | null; updated_at: string };
 const STATUSES: { id: Status; title: string; subtitle: string; tint: string }[] = [
   { id: "to_discuss", title: "To discuss", subtitle: "Ideas & open questions", tint: "stone" },
   { id: "discussing", title: "Discussing", subtitle: "Focus on the conversation", tint: "violet" },
@@ -83,7 +83,7 @@ function App() {
     const [topicRes, voteRes, timerRes] = await Promise.all([
       supabase.from("topics").select("*").order("sort_order", { ascending: true }),
       supabase.from("topic_votes").select("topic_id,voter_id"),
-      supabase.from("board_timer").select("*").eq("id", 1).maybeSingle()
+      supabase.from("timers").select("*").eq("board", boardId).maybeSingle()
     ]);
     const failure = topicRes.error || voteRes.error || timerRes.error;
     if (failure) setError(failure.message);
@@ -95,7 +95,7 @@ function App() {
         const t = timerRes.data as TimerState;
         setTimer(t);
         setDuration(t.duration_seconds);
-        setSecondsLeft(t.running && t.ends_at ? Math.max(0, new Date(t.ends_at).getTime() - Date.now()) : t.remaining_ms);
+        setSecondsLeft(t.ends_at ? Math.max(0, new Date(t.ends_at).getTime() - Date.now()) : Math.max(0, (t.remaining_seconds ?? t.duration_seconds) * 1000));
       }
     }
     setLoading(false);
@@ -108,7 +108,7 @@ function App() {
     const channel = supabase.channel(`board-${boardId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "topics" }, () => { if (alive) void loadData(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "topic_votes" }, () => { if (alive) void loadData(); })
-      .on("postgres_changes", { event: "*", schema: "public", table: "board_timer" }, () => { if (alive) void loadData(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "timers" }, () => { if (alive) void loadData(); })
       .subscribe(status => { if (alive) setConnected(status === "SUBSCRIBED"); });
     const poll = window.setInterval(() => { if (alive) void loadData(); }, 20000);
     return () => { alive = false; window.clearInterval(poll); void supabase.removeChannel(channel); };
@@ -117,12 +117,12 @@ function App() {
   useEffect(() => {
     if (!timer) return;
     const interval = window.setInterval(() => {
-      setSecondsLeft(timer.running && timer.ends_at ? Math.max(0, new Date(timer.ends_at).getTime() - Date.now()) : timer.remaining_ms);
+      setSecondsLeft(timer.ends_at ? Math.max(0, new Date(timer.ends_at).getTime() - Date.now()) : Math.max(0, (timer.remaining_seconds ?? timer.duration_seconds) * 1000));
     }, 200);
     return () => window.clearInterval(interval);
   }, [timer]);
 
-  async function saveTopic(e: React.FormEvent) {
+  async function saveTopic(e: FormEvent) {
     e.preventDefault();
     if (!supabase) return announce("Add your Supabase settings before saving topics.");
     const title = draftTitle.trim();
@@ -244,7 +244,7 @@ function App() {
         <div className="timer-left">
           <div className="timer-heading"><span className="timer-glyph"><Clock3 size={19}/></span><div><div className="section-kicker">KEEP THE MOMENTUM</div><h2>Discussion timer</h2></div></div>
           <div className="timer-current"><span className="live-pulse"/><span>{chosenTopic ? chosenTopic.title : "Ready for the next topic"}</span></div>
-          <div className="timer-hint">{timer?.running ? "Everyone’s timer is running together." : "Agree a timebox. Keep the conversation moving."}</div>
+          <div className="timer-hint">{Boolean(timer?.ends_at) ? "Everyone’s timer is running together." : "Agree a timebox. Keep the conversation moving."}</div>
         </div>
         <div className="timer-center">
           <div className={"timer-digits " + (secondsLeft < 30000 ? "timer-urgent" : "")}>{formatTime(secondsLeft)}</div>
@@ -256,7 +256,7 @@ function App() {
           <select id="duration" className="duration-select" value={duration} onChange={e => {setDuration(Number(e.target.value)); void updateTimer("reset", Number(e.target.value));}}>
             {[120,300,600,900,1200,1800].map(n => <option key={n} value={n}>{n/60} min</option>)}
           </select>
-          <button className="btn btn-dark timer-main" onClick={() => void updateTimer(timer?.running ? "pause" : "start", duration)} disabled={setupMissing}>{timer?.running ? <Pause size={15}/> : <Play size={15}/>} {timer?.running ? "Pause" : "Start"}</button>
+          <button className="btn btn-dark timer-main" onClick={() => void updateTimer(Boolean(timer?.ends_at) ? "pause" : "start", duration)} disabled={setupMissing}>{Boolean(timer?.ends_at) ? <Pause size={15}/> : <Play size={15}/>} {Boolean(timer?.ends_at) ? "Pause" : "Start"}</button>
           <button className="btn btn-outline timer-reset" onClick={() => void updateTimer("reset", duration)} title="Reset timer" disabled={setupMissing}><TimerReset size={16}/></button>
           <button className="btn btn-outline timer-plus" onClick={() => void updateTimer("add", 60)} title="Add one minute" disabled={setupMissing}>+1m</button>
         </div>
