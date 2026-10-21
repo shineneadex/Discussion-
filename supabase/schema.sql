@@ -85,7 +85,12 @@ begin
 end;
 $$;
 
+-- Remove the older increment/decrement trigger if this schema is applied to an existing board.
+drop trigger if exists topic_votes_sync on public.topic_votes;
 drop trigger if exists refresh_topic_vote_count_after_change on public.topic_votes;
+revoke all on function public.sync_topic_votes() from public, anon, authenticated;
+drop function if exists public.sync_topic_votes();
+
 create trigger refresh_topic_vote_count_after_change
 after insert or delete on public.topic_votes
 for each row execute function public.refresh_topic_vote_count();
