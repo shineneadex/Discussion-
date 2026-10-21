@@ -36,9 +36,6 @@ function formatTime(ms: number) {
   const total = Math.ceil(Math.max(0, ms) / 1000);
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
-function errorText(error: unknown) {
-  return error instanceof Error ? error.message : "Something went wrong. Please try again.";
-}
 function App() {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
@@ -71,6 +68,7 @@ function App() {
     votes: topics.reduce((sum, topic) => sum + topic.votes, 0)
   }), [topics]);
   const chosenTopic = topics.find(t => t.id === selectedTopic) || topics.find(t => t.status === "discussing") || null;
+  const timerRunning = Boolean(timer?.ends_at && secondsLeft > 0);
 
   const announce = useCallback((message: string) => {
     setToast(message);
@@ -244,7 +242,7 @@ function App() {
         <div className="timer-left">
           <div className="timer-heading"><span className="timer-glyph"><Clock3 size={19}/></span><div><div className="section-kicker">KEEP THE MOMENTUM</div><h2>Discussion timer</h2></div></div>
           <div className="timer-current"><span className="live-pulse"/><span>{chosenTopic ? chosenTopic.title : "Ready for the next topic"}</span></div>
-          <div className="timer-hint">{Boolean(timer?.ends_at) ? "Everyone’s timer is running together." : "Agree a timebox. Keep the conversation moving."}</div>
+          <div className="timer-hint">{timerRunning ? "Everyone’s timer is running together." : secondsLeft === 0 ? "Time is up — restart or reset for the next topic." : "Agree a timebox. Keep the conversation moving."}</div>
         </div>
         <div className="timer-center">
           <div className={"timer-digits " + (secondsLeft < 30000 ? "timer-urgent" : "")}>{formatTime(secondsLeft)}</div>
@@ -256,7 +254,7 @@ function App() {
           <select id="duration" className="duration-select" value={duration} onChange={e => {setDuration(Number(e.target.value)); void updateTimer("reset", Number(e.target.value));}}>
             {[120,300,600,900,1200,1800].map(n => <option key={n} value={n}>{n/60} min</option>)}
           </select>
-          <button className="btn btn-dark timer-main" onClick={() => void updateTimer(Boolean(timer?.ends_at) ? "pause" : "start", duration)} disabled={setupMissing}>{Boolean(timer?.ends_at) ? <Pause size={15}/> : <Play size={15}/>} {Boolean(timer?.ends_at) ? "Pause" : "Start"}</button>
+          <button className="btn btn-dark timer-main" onClick={() => void updateTimer(Boolean(timer?.ends_at) ? "pause" : "start", duration)} disabled={setupMissing}>{timerRunning ? <Pause size={15}/> : <Play size={15}/>} {timerRunning ? "Pause" : "Start"}</button>
           <button className="btn btn-outline timer-reset" onClick={() => void updateTimer("reset", duration)} title="Reset timer" disabled={setupMissing}><TimerReset size={16}/></button>
           <button className="btn btn-outline timer-plus" onClick={() => void updateTimer("add", 60)} title="Add one minute" disabled={setupMissing}>+1m</button>
         </div>
