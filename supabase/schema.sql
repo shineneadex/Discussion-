@@ -7,7 +7,7 @@ create extension if not exists pgcrypto;
 
 create table if not exists public.topics (
   id uuid primary key default gen_random_uuid(),
-  board text not null default 'team-meeting' check (char_length(board) between 1 and 40),
+  board text not null default 'team-meeting',
   title text not null check (char_length(title) between 1 and 200),
   description text check (description is null or char_length(description) <= 800),
   author text,
@@ -88,8 +88,13 @@ $$;
 -- Remove the older increment/decrement trigger if this schema is applied to an existing board.
 drop trigger if exists topic_votes_sync on public.topic_votes;
 drop trigger if exists refresh_topic_vote_count_after_change on public.topic_votes;
-revoke all on function public.sync_topic_votes() from public, anon, authenticated;
-drop function if exists public.sync_topic_votes();
+do $
+begin
+  if to_regprocedure('public.sync_topic_votes()') is not null then
+    execute 'revoke all on function public.sync_topic_votes() from public, anon, authenticated';
+    execute 'drop function public.sync_topic_votes()';
+  end if;
+end $;
 
 create trigger refresh_topic_vote_count_after_change
 after insert or delete on public.topic_votes
