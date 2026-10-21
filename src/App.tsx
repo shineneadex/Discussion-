@@ -79,7 +79,7 @@ function App() {
     if (!supabase) { setLoading(false); setConnected(false); return; }
     if (showLoading) setLoading(true);
     const [topicRes, voteRes, timerRes] = await Promise.all([
-      supabase.from("topics").select("*").order("sort_order", { ascending: true }),
+      supabase.from("topics").select("*").eq("board", boardId).order("sort_order", { ascending: true }),
       supabase.from("topic_votes").select("topic_id,voter_id"),
       supabase.from("timers").select("*").eq("board", boardId).maybeSingle()
     ]);
@@ -129,7 +129,7 @@ function App() {
     const payload = { title, description: draftDescription.trim() || null, author: draftAuthor.trim() || "Team", status: draftStatus };
     const result = editId
       ? await supabase.from("topics").update(payload).eq("id", editId).select().single()
-      : await supabase.from("topics").insert({ ...payload, sort_order: Date.now() }).select().single();
+      : await supabase.from("topics").insert({ ...payload, board: boardId, sort_order: Date.now() }).select().single();
     setBusyId(null);
     if (result.error) { setError(result.error.message); announce("Could not save topic"); return; }
     if (draftAuthor.trim()) localStorage.setItem("discussion-board-name", draftAuthor.trim());
